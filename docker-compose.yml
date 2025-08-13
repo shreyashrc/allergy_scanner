@@ -1,0 +1,32 @@
+# docker-compose configuration for the Allergy Scanner app
+# - Builds the image from the Dockerfile
+# - Maps port 8000
+# - Persists the SQLite database file to a named volume
+# - Loads environment variables from .env
+# - Includes healthcheck using the /health endpoint
+
+version: "3.9"
+
+services:
+  api:
+    build: .
+    container_name: allergy_scanner_api
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist the SQLite database file
+      - db_data:/app/allergen_scanner.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  db_data:
+    driver: local
+

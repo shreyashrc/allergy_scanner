@@ -1,0 +1,30 @@
+# Ignore Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Ignore local environment files
+.env
+.env.*
+
+# Ignore VCS
+.git/
+.gitignore
+
+# Ignore IDE/editor files
+.vscode/
+.idea/
+
+# Ignore local databases and data files
+*.db
+*.sqlite
+allergen_scanner.db
+
+# Ignore test artifacts
+.pytest_cache/
+coverage*/
+
