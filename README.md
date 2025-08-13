@@ -75,6 +75,22 @@ The project has a simple, beautiful single-page UI for testing the API.
 - Scan results (product name/brand, matched allergens, message, ingredients, image)
 - Recent scan history viewer with risk badges
 
+## Live Deployment (Render)
+Deployed using Render.com with a Dockerized API and a Static Site for the UI.
+
+- API Swagger UI: [allerguard-pro.onrender.com/docs][api-docs]
+- API Health: [allerguard-pro.onrender.com/health][api-health]
+- UI Demo: [allerguard-pro-ui.onrender.com][ui-demo]
+
+What these links are:
+- [API Swagger UI][api-docs]: Interactive OpenAPI docs for trying endpoints. Use Authorize to paste the Bearer token after login.
+- [API Health][api-health]: JSON healthcheck used by platform health checks, returns status and timestamp.
+- [UI Demo][ui-demo]: Single-page Tailwind/Alpine client to register/login, scan by barcode or image (drag & drop/camera), and view results/history.
+
+Hosting details:
+- API: Render Web Service built from Dockerfile (installs libzbar0). Persistent disk mounted (e.g., /data) for SQLite DB.
+- UI: Render Static Site serving `index.html` (no build). The UI’s BASE_URL points to the API URL.
+
 
 ## API Documentation
 - Interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs)
@@ -271,3 +287,7 @@ curl -X POST http://localhost:8000/scan \
   "message": "WARNING: Contains nuts, dairy"
 }
 ```
+
+[api-docs]: https://allerguard-pro.onrender.com/docs#
+[api-health]: https://allerguard-pro.onrender.com/health
+[ui-demo]: https://allerguard-pro-ui.onrender.com/
