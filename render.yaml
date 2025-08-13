@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: allerguard-api
+    name: allerguard-pro
     env: docker
     healthCheckPath: /health
     autoDeploy: true
@@ -22,6 +22,6 @@ services:
       - key: CORS_ALLOW_ORIGINS
         value: https://YOUR-UI-ON-RENDER.onrender.com
   - type: static
-    name: allerguard-ui
+    name: allerguard-pro-ui
     buildCommand: "echo no-build"
     publishPath: .
