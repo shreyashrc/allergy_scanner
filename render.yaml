@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: allerguard-api
+    env: docker
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 2
+    envVars:
+      - key: SECRET_KEY
+        value: change-me
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:////data/allergen_scanner.db
+      - key: ACCESS_TOKEN_EXPIRE_HOURS
+        value: "24"
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: OFF_API_BASE
+        value: https://world.openfoodfacts.org/api/v0
+      - key: CORS_ALLOW_ORIGINS
+        value: https://YOUR-UI-ON-RENDER.onrender.com
+  - type: static
+    name: allerguard-ui
+    buildCommand: "echo no-build"
+    publishPath: .
