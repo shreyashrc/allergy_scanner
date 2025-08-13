@@ -1,0 +1,2 @@
+"""Allergy Scanner application package."""
+

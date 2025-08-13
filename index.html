@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AllerGuard Pro - Food Allergy Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        
+        /* Animations */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.5); }
+            50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.8); }
+        }
+        
+        @keyframes slide-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+        .animate-slide-up { animation: slide-up 0.5s ease-out; }
+        
+        /* Gradient backgrounds */
+        .gradient-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .gradient-hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .gradient-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            animation: shimmer 3s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+        
+        /* Glass morphism */
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .glass-dark {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            border: 3px solid rgba(99, 102, 241, 0.1);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Notification animation */
+        .notification-enter {
+            animation: slide-in-right 0.3s ease-out;
+        }
+        
+        @keyframes slide-in-right {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        /* Risk level badges */
+        .risk-safe {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        .risk-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        
+        .risk-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        /* Prevent flash for x-show elements before Alpine initializes */
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div x-data="allergyScanner()" x-init="init()">
+        <!-- Modern Navigation -->
+        <nav class="fixed top-0 w-full z-50 glass">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">AllerGuard Pro</h1>
+                            <p class="text-xs text-gray-500">Food Allergy Scanner</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-2 h-2 rounded-full" :class="apiHealthy ? 'bg-green-500' : 'bg-red-500'"></div>
+                            <span class="text-sm text-gray-600" x-text="apiHealthy ? 'API Online' : 'API Offline'"></span>
+                        </div>
+                        
+                        <template x-if="isAuthenticated">
+                            <div class="flex items-center space-x-3">
+                                <button @click="showProfile = !showProfile" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition">
+                                    <div class="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center">
+                                        <span class="text-white text-sm font-semibold" x-text="userEmail ? userEmail[0].toUpperCase() : 'U'"></span>
+                                    </div>
+                                    <span class="text-sm font-medium text-gray-700" x-text="userEmail || 'User'"></span>
+                                </button>
+                                <button @click="logout()" class="text-sm text-gray-500 hover:text-red-600 transition">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="pt-16">
+            <!-- Hero Section (shown when not authenticated) -->
+            <template x-if="!isAuthenticated">
+                <div class="gradient-hero text-white">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+                        <div class="text-center animate-slide-up">
+                            <h2 class="text-5xl font-bold mb-6">Scan. Detect. Stay Safe.</h2>
+                            <p class="text-xl mb-8 text-purple-100">Instantly identify allergens in any food product with AI-powered scanning</p>
+                            
+                            <div class="flex justify-center space-x-4 mb-12">
+                                <div class="flex items-center space-x-2 bg-white/20 rounded-full px-4 py-2 glass">
+                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                        <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span>Real-time Scanning</span>
+                                </div>
+                                <div class="flex items-center space-x-2 bg-white/20 rounded-full px-4 py-2 glass">
+                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span>2M+ Products</span>
+                                </div>
+                                <div class="flex items-center space-x-2 bg-white/20 rounded-full px-4 py-2 glass">
+                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100-4h-.5a1 1 0 000-2H8a2 2 0 012-2h2a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span>Instant Results</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Authentication Forms -->
+            <template x-if="!isAuthenticated">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <!-- Login Card -->
+                        <div class="bg-white rounded-2xl shadow-xl overflow-hidden transform hover:scale-[1.02] transition-transform duration-300">
+                            <div class="bg-gradient-to-r from-indigo-500 to-purple-600 p-6">
+                                <h3 class="text-2xl font-bold text-white">Welcome Back</h3>
+                                <p class="text-purple-100 mt-2">Sign in to your account</p>
+                            </div>
+                            <div class="p-8">
+                                <div class="space-y-5">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                                        <input type="email" x-model="loginForm.email" 
+                                               @keydown.enter="login()"
+                                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                                               placeholder="you@example.com">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                                        <input type="password" x-model="loginForm.password"
+                                               @keydown.enter="login()"
+                                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                                               placeholder="••••••••">
+                                    </div>
+                                    <button @click="login()" 
+                                            class="w-full py-3 px-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition duration-200">
+                                        Sign In
+                                    </button>
+                                    <p class="text-center text-sm text-gray-500">
+                                        Demo: test@example.com / test123
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Register Card -->
+                        <div class="bg-white rounded-2xl shadow-xl overflow-hidden transform hover:scale-[1.02] transition-transform duration-300">
+                            <div class="bg-gradient-to-r from-purple-500 to-pink-600 p-6">
+                                <h3 class="text-2xl font-bold text-white">Get Started</h3>
+                                <p class="text-pink-100 mt-2">Create your free account</p>
+                            </div>
+                            <div class="p-8">
+                                <div class="space-y-5">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                                        <input type="email" x-model="registerForm.email"
+                                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                                               placeholder="you@example.com">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                                        <input type="password" x-model="registerForm.password"
+                                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                                               placeholder="Create a strong password">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Your Allergens</label>
+                                        <div class="grid grid-cols-3 gap-2 mb-3">
+                                            <template x-for="allergen in commonAllergens" :key="allergen">
+                                                <button @click="toggleAllergen(allergen)"
+                                                        :class="selectedAllergens.includes(allergen) ? 'bg-purple-100 border-purple-500 text-purple-700' : 'bg-white border-gray-300 text-gray-700'"
+                                                        class="px-3 py-2 border rounded-lg text-sm font-medium hover:shadow-md transition">
+                                                    <span x-text="allergen"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                        <input type="text" x-model="registerForm.allergens"
+                                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                                               placeholder="Or type custom allergens (comma-separated)">
+                                    </div>
+                                    <button @click="register()"
+                                            class="w-full py-3 px-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition duration-200">
+                                        Create Account
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Main Scanner Interface (shown when authenticated) -->
+            <template x-if="isAuthenticated">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <!-- User Profile Card (collapsible) -->
+                    <div x-show="showProfile" x-transition x-cloak @click.outside="showProfile = false" @keydown.escape.window="showProfile = false" class="mb-8">
+                        <div class="bg-white rounded-2xl shadow-lg p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-gray-800">Your Profile</h3>
+                                <button @click="showProfile = false" class="text-gray-400 hover:text-gray-600">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-sm text-gray-500">Email</p>
+                                    <p class="font-medium" x-text="userEmail"></p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500 mb-2">Your Allergens</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <template x-for="allergen in userAllergens" :key="allergen">
+                                            <span class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium" x-text="allergen"></span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scanner Section -->
+                    <div class="grid lg:grid-cols-2 gap-8 mb-8">
+                        <!-- Scan Input Card -->
+                        <div class="bg-white rounded-2xl shadow-xl p-8">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                                <svg class="w-8 h-8 mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                </svg>
+                                Scan Product
+                            </h2>
+
+                            <!-- Barcode Input -->
+                            <div class="mb-6">
+                                <label class="block text-sm font-medium text-gray-700 mb-3">Enter Barcode Number</label>
+                                <div class="flex space-x-3">
+                                    <input type="text" x-model="barcodeInput"
+                                           @keydown.enter="scanBarcode()"
+                                           class="flex-1 px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                                           placeholder="e.g., 3017620422003">
+                                    <button @click="scanBarcode()"
+                                            class="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition duration-200">
+                                        Scan
+                                    </button>
+                                </div>
+                                
+                                <!-- Quick test buttons -->
+                                <div class="mt-3">
+                                    <p class="text-xs text-gray-500 mb-2">Quick test:</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button @click="barcodeInput = '3017620422003'; scanBarcode()"
+                                                class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium hover:bg-orange-200 transition">
+                                            🥜 Nutella
+                                        </button>
+                                        <button @click="barcodeInput = '5449000214799'; scanBarcode()"
+                                                class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium hover:bg-blue-200 transition">
+                                            🥤 Coca-Cola
+                                        </button>
+                                        <button @click="barcodeInput = '8076809513388'; scanBarcode()"
+                                                class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium hover:bg-yellow-200 transition">
+                                            🍝 Pasta
+                                        </button>
+                                        <button @click="barcodeInput = '3017620425035'; scanBarcode()"
+                                                class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium hover:bg-purple-200 transition">
+                                            🍫 Ferrero
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Image Upload -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-3">Or Upload Barcode Image</label>
+                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-indigo-500 transition cursor-pointer"
+                                     @click="$refs.imageInput.click()"
+                                     @dragover.prevent="dragOver = true"
+                                     @dragleave.prevent="dragOver = false"
+                                     @drop.prevent="handleDrop($event)"
+                                     :class="dragOver ? 'border-indigo-500 bg-indigo-50' : ''">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    <p class="mt-2 text-sm text-gray-600">Drop image here or click to browse</p>
+                                    <input type="file" x-ref="imageInput" @change="handleImageUpload($event)" accept="image/*" class="hidden">
+                                </div>
+                                
+                                <!-- Camera capture for mobile -->
+                                <div class="mt-3">
+                                    <button @click="$refs.cameraInput.click()"
+                                            class="w-full py-3 px-4 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition flex items-center justify-center">
+                                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        </svg>
+                                        Use Camera
+                                    </button>
+                                    <input type="file" x-ref="cameraInput" @change="handleImageUpload($event)" accept="image/*" capture="environment" class="hidden">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Results Card -->
+                        <div class="bg-white rounded-2xl shadow-xl p-8">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                                <svg class="w-8 h-8 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                                </svg>
+                                Scan Results
+                            </h2>
+
+                            <!-- Loading State -->
+                            <div x-show="isScanning" class="flex flex-col items-center justify-center py-12">
+                                <div class="spinner mb-4"></div>
+                                <p class="text-gray-500">Analyzing product...</p>
+                            </div>
+
+                            <!-- No Results State -->
+                            <div x-show="!isScanning && !scanResult" x-cloak class="text-center py-12">
+                                <svg class="mx-auto h-24 w-24 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                </svg>
+                                <p class="mt-4 text-gray-500">Scan a product to see results</p>
+                            </div>
+
+                            <!-- Results Display -->
+                            <div x-show="!isScanning && scanResult" x-cloak class="space-y-4">
+                                <!-- Risk Level Badge -->
+                                <div class="flex justify-center">
+                                    <div :class="{
+                                            'risk-safe': scanResult?.risk_level === 'safe',
+                                            'risk-warning': scanResult?.risk_level === 'warning',
+                                            'risk-danger': scanResult?.risk_level === 'danger'
+                                         }"
+                                         class="px-6 py-3 rounded-full text-white font-bold text-lg shadow-lg animate-pulse-glow">
+                                        <span x-text="scanResult?.risk_level?.toUpperCase() || 'UNKNOWN'"></span>
+                                    </div>
+                                </div>
+
+                                <!-- Product Info -->
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <h3 class="font-bold text-lg text-gray-800" x-text="scanResult?.product_name || 'Unknown Product'"></h3>
+                                    <p class="text-gray-600" x-text="scanResult?.brand || 'Unknown Brand'"></p>
+                                </div>
+
+                                <!-- Allergen Detection -->
+                                <div x-show="scanResult?.matched_allergens?.length > 0" class="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 class="font-semibold text-red-800 mb-2">⚠️ Allergens Detected</h4>
+                                    <div class="flex flex-wrap gap-2">
+                                        <template x-for="allergen in scanResult?.matched_allergens" :key="allergen">
+                                            <span class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium" x-text="allergen"></span>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <!-- Message -->
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <p class="text-blue-800" x-text="scanResult?.message"></p>
+                                </div>
+
+                                <!-- Ingredients -->
+                                <details class="bg-gray-50 rounded-lg p-4" @keydown.escape.window="$el.removeAttribute('open')">
+                                    <summary class="cursor-pointer font-semibold text-gray-700">View Ingredients</summary>
+                                    <p class="mt-2 text-sm text-gray-600 whitespace-pre-wrap" x-text="scanResult?.ingredients || 'No ingredients listed'"></p>
+                                </details>
+
+                                <!-- Product Image -->
+                                <template x-if="scanResult?.image_url">
+                                    <img :src="scanResult.image_url" alt="Product" class="w-full rounded-lg shadow-md">
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scan History -->
+                    <div class="bg-white rounded-2xl shadow-xl p-8">
+                        <div class="flex items-center justify-between mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                                <svg class="w-8 h-8 mr-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Recent Scans
+                            </h2>
+                            <button @click="loadHistory()"
+                                    class="px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition">
+                                Refresh
+                            </button>
+                        </div>
+
+                        <div x-show="!scanHistory || scanHistory.length === 0" class="text-center py-8 text-gray-500">
+                            No scan history yet
+                        </div>
+
+                        <div x-show="scanHistory && scanHistory.length > 0" x-cloak class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <template x-for="(item, idx) in scanHistory" :key="(item.barcode || 'n/a') + '-' + (item.date_scanned || idx)">
+                                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition">
+                                    <div class="flex items-start justify-between mb-2">
+                                        <div class="flex-1">
+                                            <h4 class="font-semibold text-gray-800" x-text="item.product_name || 'Unknown'"></h4>
+                                            <p class="text-sm text-gray-500" x-text="item.brand || '—'"></p>
+                                        </div>
+                                        <div :class="{
+                                                'risk-safe': item.risk_level === 'safe',
+                                                'risk-warning': item.risk_level === 'warning',
+                                                'risk-danger': item.risk_level === 'danger'
+                                             }"
+                                             class="px-2 py-1 rounded-full text-white text-xs font-medium">
+                                            <span x-text="item.risk_level?.toUpperCase() || 'UNKNOWN'"></span>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-gray-400" x-text="item.barcode"></p>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div class="fixed bottom-4 right-4 space-y-2 z-50" id="toastContainer">
+            <template x-for="(toast, index) in toasts" :key="'toast-' + index + '-' + (toast.id || Date.now())">
+                <div x-show="toast.visible"
+                     x-transition:enter="notification-enter"
+                     x-transition:leave="transition ease-in duration-200"
+                     x-transition:leave-start="opacity-100 translate-x-0"
+                     x-transition:leave-end="opacity-0 translate-x-full"
+                     :class="{
+                        'bg-green-500': toast.type === 'success',
+                        'bg-red-500': toast.type === 'error',
+                        'bg-blue-500': toast.type === 'info',
+                        'bg-amber-500': toast.type === 'warning'
+                     }"
+                     class="text-white px-6 py-3 rounded-lg shadow-lg flex items-center justify-between space-x-3 min-w-[300px]">
+                    <span x-text="toast.message" class="flex-1"></span>
+                    <button @click="removeToast(index)" 
+                            class="text-white/80 hover:text-white transition-colors duration-150 flex-shrink-0 p-1 hover:bg-white/20 rounded"
+                            aria-label="Close notification">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <script>
+        function allergyScanner() {
+            return {
+                // State
+                isAuthenticated: false,
+                token: null,
+                userEmail: '',
+                userAllergens: [],
+                showProfile: false,
+                apiHealthy: true,
+                
+                // Forms
+                loginForm: { email: 'test@example.com', password: 'test123' },
+                registerForm: { email: '', password: '', allergens: '' },
+                
+                // Scanner
+                barcodeInput: '',
+                isScanning: false,
+                scanResult: null,
+                scanHistory: [],
+                dragOver: false,
+                
+                // UI
+                toasts: [],
+                commonAllergens: ['nuts', 'dairy', 'gluten', 'eggs', 'soy', 'shellfish'],
+                selectedAllergens: [],
+                
+                // Base URL
+                BASE_URL: 'http://localhost:8000',
+                
+                // Initialize
+                init() {
+                    // Check for saved token
+                    const savedToken = localStorage.getItem('allergy_token');
+                    if (savedToken) {
+                        this.token = savedToken;
+                        this.isAuthenticated = true;
+                        this.loadProfile();
+                        this.loadHistory();
+                    }
+                    
+                    // Check API health
+                    this.checkApiHealth();
+                    setInterval(() => this.checkApiHealth(), 30000);
+                    // Ensure drag state resets if pointer leaves window during DnD
+                    window.addEventListener('dragleave', () => { this.dragOver = false; });
+                },
+                
+                // Toast notification
+                showToast(message, type = 'info') {
+                    const toast = {
+                        id: Date.now() + Math.random(), // Unique ID for better tracking
+                        message,
+                        type,
+                        visible: true
+                    };
+                    this.toasts.push(toast);
+                    
+                    // Auto-hide after 3 seconds
+                    setTimeout(() => {
+                        this.removeToast(this.toasts.findIndex(t => t.id === toast.id));
+                    }, 3000);
+                },
+                
+                // Remove toast by index
+                removeToast(index) {
+                    if (index >= 0 && index < this.toasts.length) {
+                        const toast = this.toasts[index];
+                        toast.visible = false;
+                        
+                        // Remove from array after animation completes
+                        setTimeout(() => {
+                            this.toasts.splice(index, 1);
+                        }, 200);
+                    }
+                },
+                
+                // API Health Check
+                async checkApiHealth() {
+                    try {
+                        const response = await fetch(`${this.BASE_URL}/health`);
+                        this.apiHealthy = response.ok;
+                    } catch {
+                        this.apiHealthy = false;
+                    }
+                },
+                
+                // Authentication
+                async login() {
+                    if (!this.loginForm.email || !this.loginForm.password) {
+                        this.showToast('Please fill in all fields', 'warning');
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`${this.BASE_URL}/login`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.loginForm)
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (!response.ok) {
+                            throw new Error(data.detail || 'Login failed');
+                        }
+                        
+                        this.token = data.access_token;
+                        localStorage.setItem('allergy_token', this.token);
+                        this.isAuthenticated = true;
+                        this.showToast('Login successful!', 'success');
+                        this.loadProfile();
+                        this.loadHistory();
+                    } catch (error) {
+                        this.showToast(error.message, 'error');
+                    }
+                },
+                
+                async register() {
+                    if (!this.registerForm.email || !this.registerForm.password) {
+                        this.showToast('Please fill in all fields', 'warning');
+                        return;
+                    }
+                    
+                    // Combine selected allergens with custom input
+                    const allergens = [...this.selectedAllergens];
+                    if (this.registerForm.allergens) {
+                        allergens.push(...this.registerForm.allergens.split(',').map(a => a.trim()));
+                    }
+                    
+                    try {
+                        const response = await fetch(`${this.BASE_URL}/register`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                email: this.registerForm.email,
+                                password: this.registerForm.password,
+                                allergens: allergens
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (!response.ok) {
+                            throw new Error(data.detail || 'Registration failed');
+                        }
+                        
+                        this.token = data.access_token;
+                        localStorage.setItem('allergy_token', this.token);
+                        this.isAuthenticated = true;
+                        this.showToast('Registration successful!', 'success');
+                        this.loadProfile();
+                    } catch (error) {
+                        this.showToast(error.message, 'error');
+                    }
+                },
+                
+                logout() {
+                    this.token = null;
+                    this.isAuthenticated = false;
+                    this.userEmail = '';
+                    this.userAllergens = [];
+                    this.scanResult = null;
+                    this.scanHistory = [];
+                    localStorage.removeItem('allergy_token');
+                    this.showToast('Logged out successfully', 'info');
+                },
+                
+                // Profile
+                async loadProfile() {
+                    if (!this.token) return;
+                    
+                    try {
+                        const response = await fetch(`${this.BASE_URL}/profile`, {
+                            headers: { 'Authorization': `Bearer ${this.token}` }
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            this.userEmail = data.email;
+                            this.userAllergens = data.allergens || [];
+                        }
+                    } catch (error) {
+                        console.error('Failed to load profile:', error);
+                    }
+                },
+                
+                // Scanner
+                async scanBarcode() {
+                    if (!this.token) {
+                        this.showToast('Please login first', 'warning');
+                        return;
+                    }
+                    
+                    if (!this.barcodeInput) {
+                        this.showToast('Please enter a barcode', 'warning');
+                        return;
+                    }
+                    
+                    this.isScanning = true;
+                    
+                    try {
+                        const response = await fetch(`${this.BASE_URL}/scan`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${this.token}`
+                            },
+                            body: JSON.stringify({ barcode: this.barcodeInput })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (!response.ok) {
+                            throw new Error(data.detail || 'Scan failed');
+                        }
+                        
+                        this.scanResult = data;
+                        this.showToast('Scan successful!', 'success');
+                        
+                        // Refresh history
+                        setTimeout(() => this.loadHistory(), 500);
+                    } catch (error) {
+                        this.showToast(error.message, 'error');
+                    } finally {
+                        this.isScanning = false;
+                    }
+                },
+                
+                async scanImage(file) {
+                    if (!this.token) {
+                        this.showToast('Please login first', 'warning');
+                        return;
+                    }
+                    
+                    if (!file) {
+                        this.showToast('Please select an image', 'warning');
+                        return;
+                    }
+                    
+                    this.isScanning = true;
+                    
+                    try {
+                        // Convert to base64
+                        const reader = new FileReader();
+                        const base64 = await new Promise((resolve, reject) => {
+                            reader.onload = () => {
+                                const res = String(reader.result || '');
+                                resolve(res.includes(',') ? res.split(',')[1] : res);
+                            };
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+                        
+                        const response = await fetch(`${this.BASE_URL}/scan`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${this.token}`
+                            },
+                            body: JSON.stringify({ image: base64 })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (!response.ok) {
+                            throw new Error(data.detail || 'Scan failed');
+                        }
+                        
+                        this.scanResult = data;
+                        this.showToast('Image scanned successfully!', 'success');
+                        
+                        // Refresh history
+                        setTimeout(() => this.loadHistory(), 500);
+                    } catch (error) {
+                        this.showToast(error.message, 'error');
+                    } finally {
+                        this.isScanning = false;
+                    }
+                },
+                
+                // History
+                async loadHistory() {
+                    if (!this.token) return;
+                    
+                    try {
+                        const response = await fetch(`${this.BASE_URL}/scan-history`, {
+                            headers: { 'Authorization': `Bearer ${this.token}` }
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            this.scanHistory = data;
+                        }
+                    } catch (error) {
+                        console.error('Failed to load history:', error);
+                    }
+                },
+                
+                // File handlers
+                handleImageUpload(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.scanImage(file);
+                    }
+                },
+                
+                handleDrop(event) {
+                    this.dragOver = false;
+                    const file = event.dataTransfer.files[0];
+                    if (file) {
+                        this.scanImage(file);
+                    }
+                },
+                
+                // Allergen selection
+                toggleAllergen(allergen) {
+                    const index = this.selectedAllergens.indexOf(allergen);
+                    if (index > -1) {
+                        this.selectedAllergens.splice(index, 1);
+                    } else {
+                        this.selectedAllergens.push(allergen);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
