@@ -271,12 +271,3 @@ curl -X POST http://localhost:8000/scan \
   "message": "WARNING: Contains nuts, dairy"
 }
 ```
-
-
-## Performance
-- Typical response times are fast thanks to async I/O and caching.
-- Product data fetched from Open Food Facts is cached in SQLite with a 7-day TTL.
-- Per-user in-memory rate limiting on `/scan` (10 req/min). Consider a distributed limiter for production.
-
-
-# allergy_scanner
